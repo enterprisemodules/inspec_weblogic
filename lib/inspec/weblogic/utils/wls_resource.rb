@@ -18,12 +18,11 @@ class WlsResource < Inspec.resource(1)
     template_file = (Pathname.new(__FILE__).dirname + 'execute.py.erb')
     template = File.read(template_file)
     input_file  = tempfile_name(['input', '.py'])
-    remote_file = "/tmp/" + Pathname(input_file).basename.to_s
-    output_file = "/tmp/" + Pathname(tempfile_name(['output', '.csv'])).basename.to_s
+    remote_file  = tempfile_name(['input', '.py'])
+    output_file  = tempfile_name(['output', '.csv'])
     content = ERB.new(template, nil, '-').result(binding)
     File.open(input_file, 'w') { |f| f.write(content) }
     inspec.backend.upload(input_file, remote_file)
-
     cmd = inspec.command(command_string(remote_file))
     cmd.stdout
     fail cmd.stderr if cmd.stderr != ''
@@ -32,6 +31,7 @@ class WlsResource < Inspec.resource(1)
     # Cleanup
     #
     inspec.command("rm -f #{remote_file} #{output_file}").stdout
+    File.unlink(input_file)
     data = convert_csv_data_to_hash(output, [], :col_sep => ';')
     Hash[data.collect{|e| [e['key'], e['value']]}]
   end
@@ -39,9 +39,7 @@ class WlsResource < Inspec.resource(1)
   private
 
   def tempfile_name(options = [])
-    tmp_file = Tempfile.new(options)
-    path = tmp_file.path
-    path
+    "/tmp/#{options[0]}-#{SecureRandom.hex(10)}#{options[1]}"
   end
 
   def command_string( script)
